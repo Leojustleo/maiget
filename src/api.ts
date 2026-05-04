@@ -2,11 +2,11 @@ import type { SearchResult } from './types'
 
 const BASE_URL = import.meta.env.VITE_API_URL ?? ''
 
-export async function searchUsername(username: string): Promise<SearchResult> {
+export async function searchUsername(username: string, top: number): Promise<SearchResult> {
   const res = await fetch(`${BASE_URL}/api/search`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ username }),
+    body: JSON.stringify({ username, top }),
   })
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: 'Request failed' }))
@@ -15,26 +15,26 @@ export async function searchUsername(username: string): Promise<SearchResult> {
   return res.json()
 }
 
-// Mock for local dev without a backend running
-export function mockSearch(username: string): Promise<SearchResult> {
+export function mockSearch(username: string, top: number): Promise<SearchResult> {
+  const delay = Math.min(800 + top * 2, 4000)
   return new Promise((resolve) =>
     setTimeout(() => {
       resolve({
         username,
         total_found: 7,
-        elapsed_seconds: 4.2,
+        elapsed_seconds: +(delay / 1000).toFixed(1),
         accounts: [
-          { site: 'GitHub', url: `https://github.com/${username}`, status: 'found', category: 'Tech' },
+          { site: 'GitHub', url: `https://github.com/${username}`, status: 'found', category: 'Coding' },
           { site: 'Twitter / X', url: `https://x.com/${username}`, status: 'found', category: 'Social' },
           { site: 'Reddit', url: `https://reddit.com/user/${username}`, status: 'found', category: 'Social' },
-          { site: 'Instagram', url: `https://instagram.com/${username}`, status: 'found', category: 'Social' },
-          { site: 'HackerNews', url: `https://news.ycombinator.com/user?id=${username}`, status: 'found', category: 'Tech' },
-          { site: 'Dev.to', url: `https://dev.to/${username}`, status: 'found', category: 'Tech' },
-          { site: 'Keybase', url: `https://keybase.io/${username}`, status: 'found', category: 'Tech' },
+          { site: 'Instagram', url: `https://instagram.com/${username}`, status: 'found', category: 'Photo' },
+          { site: 'HackerNews', url: `https://news.ycombinator.com/user?id=${username}`, status: 'found', category: 'News' },
+          { site: 'Dev.to', url: `https://dev.to/${username}`, status: 'found', category: 'Coding' },
+          { site: 'Keybase', url: `https://keybase.io/${username}`, status: 'found', category: 'Coding' },
           { site: 'Facebook', url: `https://facebook.com/${username}`, status: 'not_found', category: 'Social' },
-          { site: 'TikTok', url: `https://tiktok.com/@${username}`, status: 'not_found', category: 'Social' },
+          { site: 'TikTok', url: `https://tiktok.com/@${username}`, status: 'not_found', category: 'Video' },
         ],
       })
-    }, 2800)
+    }, delay)
   )
 }

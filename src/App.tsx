@@ -13,6 +13,7 @@ export default function App() {
   const [result, setResult] = useState<SearchResult | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [currentUsername, setCurrentUsername] = useState('')
+  const [top, setTop] = useState(500)
 
   async function handleSearch(username: string) {
     setStatus('loading')
@@ -21,7 +22,7 @@ export default function App() {
     setCurrentUsername(username)
 
     try {
-      const data = USE_MOCK ? await mockSearch(username) : await searchUsername(username)
+      const data = USE_MOCK ? await mockSearch(username, top) : await searchUsername(username, top)
       setResult(data)
       setStatus('done')
     } catch (err) {
@@ -77,7 +78,7 @@ export default function App() {
         </div>
 
         {/* Search */}
-        <SearchBar onSearch={handleSearch} loading={status === 'loading'} />
+        <SearchBar onSearch={handleSearch} loading={status === 'loading'} top={top} onTopChange={setTop} />
 
         {/* States */}
         {status === 'loading' && <LoadingState username={currentUsername} />}
