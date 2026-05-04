@@ -6,7 +6,7 @@ import { searchUsername, mockSearch } from './api'
 import type { SearchResult, SearchStatus } from './types'
 import { Radar } from 'lucide-react'
 
-const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true' || import.meta.env.DEV
+const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true'
 
 export default function App() {
   const [status, setStatus] = useState<SearchStatus>('idle')

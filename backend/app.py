@@ -1,28 +1,41 @@
 import asyncio
+import logging
+import os
 import time
-from flask import Flask, request, jsonify
+
+from flask import Flask, jsonify, request
 from flask_cors import CORS
-import maigret
+from maigret.checking import maigret as maigret_search
+from maigret.result import MaigretCheckStatus
+from maigret.sites import MaigretDatabase
 
 app = Flask(__name__)
 CORS(app)
 
+logging.basicConfig(level=logging.WARNING)
+logger = logging.getLogger("maigret-backend")
 
-async def run_maigret(username: str) -> dict:
-    db = await maigret.MaigretDatabase().load_from_path(
-        maigret.MaigretDatabase.get_db_file()
+import maigret as _maigret_pkg
+_DB_PATH = os.path.join(os.path.dirname(_maigret_pkg.__file__), "resources", "data.json")
+
+
+def _load_db() -> dict:
+    db = MaigretDatabase()
+    db.load_from_path(_DB_PATH)
+    return {s.name: s for s in db.sites_dict.values() if s.name}
+
+
+async def _run_search(username: str, top: int) -> dict:
+    site_dict = _load_db()
+    site_dict = dict(list(site_dict.items())[:top])
+    return await maigret_search(
+        username,
+        site_dict,
+        logger=logger,
+        timeout=10,
+        max_connections=50,
+        no_progressbar=True,
     )
-    sites = db.sites
-
-    results: dict = {}
-
-    async def check_site(site_name, site):
-        result = await maigret.self_check(username, site, results, db)
-        return result
-
-    tasks = [check_site(name, site) for name, site in list(sites.items())[:500]]
-    await asyncio.gather(*tasks, return_exceptions=True)
-    return results
 
 
 @app.post("/api/search")
@@ -34,32 +47,41 @@ def search():
     if len(username) > 60:
         return jsonify({"error": "username too long"}), 400
 
+    top = min(int(body.get("top", 500)), 3000)
     start = time.time()
+
     try:
         loop = asyncio.new_event_loop()
-        raw = loop.run_until_complete(run_maigret(username))
+        asyncio.set_event_loop(loop)
+        raw = loop.run_until_complete(_run_search(username, top))
         loop.close()
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
     accounts = []
-    for site_name, site_result in raw.items():
-        status = "found" if site_result.get("status") == maigret.MaigretCheckStatus.CLAIMED else "not_found"
+    for site_name, result in raw.items():
+        status_obj = result.get("status")
+        found = (
+            status_obj is not None
+            and status_obj.status == MaigretCheckStatus.CLAIMED
+        )
+        site = result.get("site")
+        tags = getattr(site, "tags", []) or []
         accounts.append({
             "site": site_name,
-            "url": site_result.get("url_user", ""),
-            "status": status,
-            "category": site_result.get("tags", [None])[0] if site_result.get("tags") else None,
+            "url": result.get("url_user", ""),
+            "status": "found" if found else "not_found",
+            "category": tags[0].capitalize() if tags else None,
         })
 
-    found = [a for a in accounts if a["status"] == "found"]
+    found_list = [a for a in accounts if a["status"] == "found"]
     return jsonify({
         "username": username,
-        "total_found": len(found),
+        "total_found": len(found_list),
         "elapsed_seconds": round(time.time() - start, 2),
         "accounts": accounts,
     })
 
 
 if __name__ == "__main__":
-    app.run(port=5000, debug=True)
+    app.run(port=5000, debug=False)
